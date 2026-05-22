@@ -1,0 +1,53 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Lora:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Lora", ui-serif, Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer base {
+  body {
+    @apply bg-[#0a0908] text-[#f2f4f3] antialiased;
+  }
+}
+
+/* Editorial Markdown Overrides */
+.prose {
+  @apply text-[#a9927d] max-w-none;
+}
+
+.prose h1, .prose h2, .prose h3 {
+  @apply font-serif font-light text-[#f2f4f3] tracking-tight mt-6 mb-3;
+}
+
+.prose strong {
+  @apply text-[#f2f4f3] font-semibold;
+}
+
+.prose ul {
+  @apply list-none p-0 space-y-2;
+}
+
+.prose li {
+  @apply text-sm relative pl-4 border-l border-[#5e503f];
+}
+
+.prose p {
+  @apply leading-relaxed mb-4;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: #0a0908;
+}
+::-webkit-scrollbar-thumb {
+  background: #5e503f;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a9927d;
+}

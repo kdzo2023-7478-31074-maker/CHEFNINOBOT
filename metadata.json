@@ -1,0 +1,10 @@
+{
+  "name": "Chef Nino Revise",
+  "description": "An NLP-powered cooking assistant that processes ingredients, dietary restrictions, and food cravings to suggest personalized recipes.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
