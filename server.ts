@@ -39,7 +39,25 @@ const CHEF_NINO_INTRO = "Hello! I'm Chef Nino, your cheerful digital kitchen ass
 
 // Helper to extract keywords from message
 function extractKeywords(message: string): string[] {
-    const commonWords = ["a", "the", "with", "and", "is", "for", "please", "recipe", "show", "me", "how", "to", "make", "cook", "can", "you", "find", "some", "any", "give"];
+    const commonWords = [
+        "a", "the", "with", "and", "is", "for", "please", "recipe", "recipes",
+        "show", "me", "how", "to", "make", "cook", "can", "you", "find", "some",
+        "any", "give", "want", "wants", "wanted", "wanting", "like", "likes",
+        "liked", "need", "needs", "needed", "dish", "dishes", "food", "foods",
+        "meal", "meals", "cooks", "cooked", "cooking", "prepare", "prepares",
+        "prepared", "preparing", "makes", "made", "making", "get", "gets",
+        "got", "getting", "have", "has", "had", "having", "without", "about",
+        "this", "that", "these", "those", "here", "there", "your", "my", "our",
+        "their", "his", "her", "who", "what", "where", "when", "why", "which",
+        "just", "only", "ready", "prep", "ingredient", "ingredients", "cuisine",
+        "cuisines", "style", "flavor", "flavors", "flavour", "flavours", "taste",
+        "tasty", "great", "good", "nice", "authentic", "classic", "simple",
+        "easy", "best", "favorite", "favourite", "delicious", "recommend",
+        "something", "someone", "anything", "anyone", "everything", "everyone",
+        "i'm", "i've", "you're", "you've", "we're", "we've", "they're", "they've",
+        "looking", "look", "looks", "searched", "search", "searching", "finds",
+        "found", "suggest", "suggestion", "suggestions", "option", "options"
+    ];
     return message
         .toLowerCase()
         .replace(/[^\w\s]/gi, " ")
@@ -61,6 +79,13 @@ app.get(["/api/health", "/health", "/api"], (req, res) => {
         hasSupabase: !!sanitizeEnvVar(process.env.SUPABASE_URL),
         env: process.env.NODE_ENV || "development",
         message: "Supabase recipe search agent is active."
+    });
+});
+
+app.get(["/api/config", "/config"], (req, res) => {
+    res.json({
+        supabaseUrl: sanitizeEnvVar(process.env.SUPABASE_URL),
+        supabaseAnonKey: sanitizeEnvVar(process.env.SUPABASE_ANON_KEY)
     });
 });
 
@@ -153,8 +178,49 @@ app.post(["/api/chat", "/chat", "/api", "/"], async (req, res) => {
             try {
                 let matches: any[] = [];
                 if (filterParts.length > 0) {
-                    const { data } = await baseQuery.or(filterParts.join(",")).limit(5);
-                    if (data) matches = data;
+                    const { data } = await baseQuery.or(filterParts.join(",")).limit(15);
+                    if (data) {
+                        // Score/rank based on matching keywords
+                        const scoredRecipes = data.map(recipe => {
+                            let score = 0;
+                            const titleLower = (recipe.title || "").toLowerCase();
+                            const descLower = (recipe.description || "").toLowerCase();
+                            const ingredientsText = typeof recipe.ingredients === 'string' 
+                                ? recipe.ingredients.toLowerCase() 
+                                : Array.isArray(recipe.ingredients) 
+                                    ? recipe.ingredients.join(" ").toLowerCase() 
+                                    : "";
+                            
+                            targetKeywords.forEach(kw => {
+                                const kwLower = kw.toLowerCase();
+                                if (titleLower === kwLower) {
+                                    score += 20;
+                                } else if (titleLower.includes(kwLower)) {
+                                    score += 10;
+                                    const rx = new RegExp(`\\b${kwLower}\\b`);
+                                    if (rx.test(titleLower)) {
+                                        score += 10;
+                                    }
+                                }
+                                if (descLower.includes(kwLower)) {
+                                    score += 3;
+                                    const rx = new RegExp(`\\b${kwLower}\\b`);
+                                    if (rx.test(descLower)) {
+                                        score += 2;
+                                    }
+                                }
+                                if (ingredientsText.includes(kwLower)) {
+                                    score += 5;
+                                }
+                            });
+                            return { recipe, score };
+                        });
+
+                        matches = scoredRecipes
+                            .filter(item => item.score > 0)
+                            .sort((a, b) => b.score - a.score)
+                            .map(item => item.recipe);
+                    }
                 } else if (targetDietary.length > 0) {
                     const { data } = await baseQuery.limit(5);
                     if (data) matches = data;
@@ -203,9 +269,53 @@ app.post(["/api/chat", "/chat", "/api", "/"], async (req, res) => {
             
             if (filterParts.length > 0) {
                 try {
-                    const { data, error } = await query.or(filterParts.join(",")).limit(3);
+                    const { data, error } = await query.or(filterParts.join(",")).limit(15);
                     if (!error && data) {
-                        recipes = data;
+                        // Score/rank based on matching keywords
+                        const scoredRecipes = data.map(recipe => {
+                            let score = 0;
+                            const titleLower = (recipe.title || "").toLowerCase();
+                            const descLower = (recipe.description || "").toLowerCase();
+                            const ingredientsText = typeof recipe.ingredients === 'string' 
+                                ? recipe.ingredients.toLowerCase() 
+                                : Array.isArray(recipe.ingredients) 
+                                    ? recipe.ingredients.join(" ").toLowerCase() 
+                                    : "";
+                            
+                            keywords.forEach(kw => {
+                                const kwLower = kw.toLowerCase();
+                                if (titleLower === kwLower) {
+                                    score += 20;
+                                } else if (titleLower.includes(kwLower)) {
+                                    score += 10;
+                                
+                                    // Heavy bonus if the keyword matches as a distinct word boundary in title
+                                    const rx = new RegExp(`\\b${kwLower}\\b`);
+                                    if (rx.test(titleLower)) {
+                                        score += 10;
+                                    }
+                                }
+                                if (descLower.includes(kwLower)) {
+                                    score += 3;
+                                    const rx = new RegExp(`\\b${kwLower}\\b`);
+                                    if (rx.test(descLower)) {
+                                        score += 2;
+                                    }
+                                }
+                                if (ingredientsText.includes(kwLower)) {
+                                    score += 5;
+                                }
+                            });
+                            return { recipe, score };
+                        });
+
+                        // Filter to keep only those with score > 0, then sort descending
+                        const matchedRecipes = scoredRecipes
+                            .filter(item => item.score > 0)
+                            .sort((a, b) => b.score - a.score)
+                            .map(item => item.recipe);
+
+                        recipes = matchedRecipes.slice(0, 3);
                     } else if (error) {
                         console.error("Supabase query error (Details):", error);
                     }

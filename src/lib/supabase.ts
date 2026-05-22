@@ -15,12 +15,52 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     console.warn('Supabase credentials missing. Check your .env file.');
 }
 
-export const supabase = createClient(SUPABASE_URL || 'https://placeholder.supabase.co', SUPABASE_ANON_KEY || 'placeholder');
+// Support dynamic client self-healing for Vercel/production environments
+let activeClient = createClient(SUPABASE_URL || 'https://placeholder.supabase.co', SUPABASE_ANON_KEY || 'placeholder');
+let isSupabaseConfigured = !!SUPABASE_URL && 
+                           SUPABASE_URL !== 'https://placeholder.supabase.co' && 
+                           !!SUPABASE_ANON_KEY && 
+                           SUPABASE_ANON_KEY !== 'placeholder';
 
-const isSupabaseConfigured = !!SUPABASE_URL && 
-                             SUPABASE_URL !== 'https://placeholder.supabase.co' && 
-                             !!SUPABASE_ANON_KEY && 
-                             SUPABASE_ANON_KEY !== 'placeholder';
+export const supabase = new Proxy({} as any, {
+    get(target, prop) {
+        const val = Reflect.get(activeClient, prop);
+        if (typeof val === 'function') {
+            return val.bind(activeClient);
+        }
+        return val;
+    }
+});
+
+export const updateSupabaseClient = (url: string, key: string) => {
+    if (!url || url === 'https://placeholder.supabase.co' || !key || key === 'placeholder') return;
+    try {
+        activeClient = createClient(url, key);
+        isSupabaseConfigured = true;
+        console.log("Supabase client dynamically successfully reconfigured with active credentials!");
+    } catch (e) {
+        console.error("Failed to dynamically initialize Supabase client:", e);
+    }
+};
+
+// Asynchronous background config poll upon startup
+const fetchDynamicConfigOnLoad = async () => {
+    try {
+        const res = await fetch('/api/config');
+        if (res.ok) {
+            const data = await res.json();
+            if (data.supabaseUrl && data.supabaseAnonKey) {
+                updateSupabaseClient(data.supabaseUrl, data.supabaseAnonKey);
+            }
+        }
+    } catch (e) {
+        console.warn("Dynamic configuration fetch bypassed or unavailable. Standard fallbacks active:", e);
+    }
+};
+
+if (typeof window !== 'undefined') {
+    fetchDynamicConfigOnLoad();
+}
 
 // Types
 export interface Profile {
