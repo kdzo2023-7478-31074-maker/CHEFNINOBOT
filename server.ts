@@ -69,9 +69,7 @@ app.post("/api/chat", async (req, res) => {
             return res.status(400).json({ error: "Message is required" });
         }
 
-        if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
-            return res.status(500).json({ error: "Server configuration error: missing Supabase credentials" });
-        }
+        const isSupabaseConfigured = !!process.env.SUPABASE_URL && !!process.env.SUPABASE_ANON_KEY;
 
         const allKeywords = extractKeywords(message);
         const dietaryTags = extractDietaryRestrictions(message);
@@ -81,11 +79,11 @@ app.post("/api/chat", async (req, res) => {
             .filter(kw => !dietaryTags.some(dt => dt.includes(kw) || kw.includes(dt)))
             .slice(0, 5); 
 
-        console.log(`Searching recipes. Keywords: ${keywords.join(", ")}, Dietary: ${dietaryTags.join(", ")}`);
+        console.log(`Searching recipes. Keywords: ${keywords.join(", ")}, Dietary: ${dietaryTags.join(", ")}, Supabase active: ${isSupabaseConfigured}`);
 
         let recipes: any[] = [];
         
-        if (keywords.length > 0 || dietaryTags.length > 0) {
+        if (isSupabaseConfigured && (keywords.length > 0 || dietaryTags.length > 0)) {
             // Build query
             let query = supabase.from("recipes").select("*");
             

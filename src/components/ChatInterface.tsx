@@ -221,19 +221,27 @@ export function ChatInterface() {
         })
       });
 
-      const data = await res.json();
-      
       if (!res.ok) {
+        let errorMessageText = "Chef Nino encountered an unexpected cooking interruption. Clearing the cook station...";
+        try {
+          const errData = await res.json();
+          if (errData && errData.error) {
+            errorMessageText = errData.error;
+          }
+        } catch (_) {}
+
         const errorMessage = {
           session_id: session.id,
           user_id: session.user_id,
           role: 'assistant',
-          content: `Prep Station Interruption\n\nChef Nino encountered an unexpected cooking interruption. Clearing the cook station...`,
+          content: `Prep Station Interruption\n\n${errorMessageText}`,
           created_at: new Date().toISOString()
         };
         setMessages(prev => [...prev, errorMessage]);
         return;
       }
+
+      const data = await res.json();
       
       const botMessage = {
         session_id: session.id,
