@@ -179,6 +179,9 @@ export function ChatInterface() {
   const handleSendMessage = async (text: string) => {
     if (!text.trim() || !session) return;
 
+    const { data: { user } } = await supabase.auth.getUser();
+    const resolvedUserId = user?.id || session.user_id || 'local-user';
+
     // 1. Run NLP pipeline on user input
     const analysis = runNlpPipeline(text);
     setLastAnalysis(analysis);
@@ -186,7 +189,7 @@ export function ChatInterface() {
 
     const userMessage = {
       session_id: session.id,
-      user_id: session.user_id,
+      user_id: resolvedUserId,
       role: 'user',
       content: text,
       sentiment: analysis.sentiment,
@@ -238,7 +241,7 @@ export function ChatInterface() {
         const errMsg = data.error || `Prep Station Interruption\n\nChef Nino encountered an unexpected cooking interruption (Status code: ${res.status}).`;
         const errorMessage = {
           session_id: session.id,
-          user_id: session.user_id,
+          user_id: resolvedUserId,
           role: 'bot',
           content: errMsg,
           created_at: new Date().toISOString()
@@ -249,7 +252,7 @@ export function ChatInterface() {
       
       const botMessage = {
         session_id: session.id,
-        user_id: session.user_id,
+        user_id: resolvedUserId,
         role: 'bot',
         content: data.response || "No response received",
         created_at: new Date().toISOString()
@@ -263,7 +266,7 @@ export function ChatInterface() {
       console.error("Chat error:", err);
       const errorMessage = {
         session_id: session.id,
-        user_id: session.user_id,
+        user_id: resolvedUserId,
         role: 'bot',
         content: `Pantry Network Offline\n\nA network ripple interrupted Chef Nino. Please ensure the kitchen is active.`,
         created_at: new Date().toISOString()
