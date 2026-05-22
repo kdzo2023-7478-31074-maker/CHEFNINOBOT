@@ -221,14 +221,26 @@ export function ChatInterface() {
         })
       });
 
-      const data = await res.json();
+      let data: any = {};
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        try {
+          data = await res.json();
+        } catch (jsonErr) {
+          console.error("Failed to parse JSON response:", jsonErr);
+        }
+      } else {
+        const textPayload = await res.text();
+        console.warn("Received non-JSON response payload:", textPayload);
+      }
       
       if (!res.ok) {
+        const errMsg = data.error || `Prep Station Interruption\n\nChef Nino encountered an unexpected cooking interruption (Status code: ${res.status}).`;
         const errorMessage = {
           session_id: session.id,
           user_id: session.user_id,
           role: 'bot',
-          content: `Prep Station Interruption\n\nChef Nino encountered an unexpected cooking interruption. Clearing the cook station...`,
+          content: errMsg,
           created_at: new Date().toISOString()
         };
         setMessages(prev => [...prev, errorMessage]);
@@ -239,7 +251,7 @@ export function ChatInterface() {
         session_id: session.id,
         user_id: session.user_id,
         role: 'bot',
-        content: data.response,
+        content: data.response || "No response received",
         created_at: new Date().toISOString()
       };
 

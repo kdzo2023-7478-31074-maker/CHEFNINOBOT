@@ -1,6 +1,5 @@
 import express from "express";
 import path from "path";
-import { createServer as createViteServer } from "vite";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 import { generateInteractiveResponse } from "./chefEngine";
@@ -26,9 +25,14 @@ app.use(express.json());
  * - created_at: timestamptz
  */
 
+const sanitizeEnvVar = (val: string | undefined): string => {
+    if (!val) return "";
+    return val.trim().replace(/^['"““”\s]+|['"““”\s]+$/g, "");
+};
+
 // Initialize Supabase
-const supabaseUrl = process.env.SUPABASE_URL || "https://placeholder.supabase.co";
-const supabaseKey = process.env.SUPABASE_ANON_KEY || "placeholder";
+const supabaseUrl = sanitizeEnvVar(process.env.SUPABASE_URL) || "https://placeholder.supabase.co";
+const supabaseKey = sanitizeEnvVar(process.env.SUPABASE_ANON_KEY) || "placeholder";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const CHEF_NINO_INTRO = "Hello! I'm Chef Nino, your cheerful digital kitchen assistant! 👨‍🍳✨";
@@ -51,17 +55,17 @@ function extractDietaryRestrictions(message: string): string[] {
 }
 
 // API Routes
-app.get("/api/health", (req, res) => {
+app.get(["/api/health", "/health", "/api"], (req, res) => {
     res.json({ 
         status: "ok", 
-        hasSupabase: !!process.env.SUPABASE_URL,
+        hasSupabase: !!sanitizeEnvVar(process.env.SUPABASE_URL),
         env: process.env.NODE_ENV || "development",
         message: "Supabase recipe search agent is active."
     });
 });
 
-app.post("/api/chat", async (req, res) => {
-    console.log("POST /api/chat received - Dynamic Interactive Gemini mode");
+app.post(["/api/chat", "/chat", "/api", "/"], async (req, res) => {
+    console.log("POST /api/chat (or compatible route) received - Dynamic Interactive Gemini mode");
     try {
         const { message, history, nlpAnalysis } = req.body;
         
@@ -69,10 +73,12 @@ app.post("/api/chat", async (req, res) => {
             return res.status(400).json({ error: "Message is required" });
         }
 
-        const hasRealSupabase = process.env.SUPABASE_URL && 
-                              process.env.SUPABASE_URL !== "https://placeholder.supabase.co" && 
-                              process.env.SUPABASE_ANON_KEY && 
-                              process.env.SUPABASE_ANON_KEY !== "placeholder";
+        const realSupabaseUrl = sanitizeEnvVar(process.env.SUPABASE_URL);
+        const realSupabaseKey = sanitizeEnvVar(process.env.SUPABASE_ANON_KEY);
+        const hasRealSupabase = realSupabaseUrl && 
+                              realSupabaseUrl !== "https://placeholder.supabase.co" && 
+                              realSupabaseKey && 
+                              realSupabaseKey !== "placeholder";
 
         const allKeywords = extractKeywords(message);
         const dietaryTags = extractDietaryRestrictions(message);
@@ -86,7 +92,7 @@ app.post("/api/chat", async (req, res) => {
 
         let recipes: any[] = [];
         
-        if (hasRealSupabase && (keywords.length > 0 || dietaryTags.length > 0)) {
+        if (hasRealSupabase) {
             // Build query
             let query = supabase.from("recipes").select("*");
             
@@ -127,6 +133,16 @@ app.post("/api/chat", async (req, res) => {
                 } catch (err) {
                     console.error("Supabase query error:", err);
                 }
+            } else {
+                // Fetch default recipes instead of empty list so we directly access Supabase for content
+                try {
+                    const { data, error } = await supabase.from("recipes").select("*").limit(3);
+                    if (!error && data) {
+                        recipes = data;
+                    }
+                } catch (err) {
+                    console.error("Supabase default query error:", err);
+                }
             }
         }
 
@@ -152,12 +168,17 @@ app.post("/api/chat", async (req, res) => {
 
 // Vite middleware for development
 async function setupVite() {
-    if (process.env.NODE_ENV !== "production") {
-        const vite = await createViteServer({
-            server: { middlewareMode: true },
-            appType: "spa",
-        });
-        app.use(vite.middlewares);
+    if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
+        try {
+            const { createServer: createViteServer } = await import("vite");
+            const vite = await createViteServer({
+                server: { middlewareMode: true },
+                appType: "spa",
+            });
+            app.use(vite.middlewares);
+        } catch (viteError) {
+            console.error("Failed to load Vite server:", viteError);
+        }
     } else {
         const distPath = path.join(process.cwd(), "dist");
         app.use(express.static(distPath));

@@ -281,11 +281,12 @@ export function generateInteractiveResponse(
             }
 
             // Capture category for sidebars
-            if (recipe.title.toLowerCase().includes("curry")) selectedCoreMealCategory = "Curry";
-            else if (recipe.title.toLowerCase().includes("salad")) selectedCoreMealCategory = "Salad";
-            else if (recipe.title.toLowerCase().includes("tofu")) selectedCoreMealCategory = "Tofu";
-            else if (recipe.title.toLowerCase().includes("salmon")) selectedCoreMealCategory = "Salmon";
-            else if (recipe.title.toLowerCase().includes("adobo")) selectedCoreMealCategory = "Adobo";
+            const safeTitle = (recipe.title || "").toLowerCase();
+            if (safeTitle.includes("curry")) selectedCoreMealCategory = "Curry";
+            else if (safeTitle.includes("salad")) selectedCoreMealCategory = "Salad";
+            else if (safeTitle.includes("tofu")) selectedCoreMealCategory = "Tofu";
+            else if (safeTitle.includes("salmon")) selectedCoreMealCategory = "Salmon";
+            else if (safeTitle.includes("adobo")) selectedCoreMealCategory = "Adobo";
 
             // Ingredients list
             text += `**🛒 Pantry Checklist:**\n`;

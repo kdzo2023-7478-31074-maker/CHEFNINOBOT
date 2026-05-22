@@ -3,8 +3,13 @@
 // ============================================================
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = process.env.SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
+const sanitizeEnvVar = (val: string | undefined): string => {
+    if (!val) return "";
+    return val.trim().replace(/^['"““”\s]+|['"““”\s]+$/g, "");
+};
+
+const SUPABASE_URL = sanitizeEnvVar(process.env.SUPABASE_URL || '');
+const SUPABASE_ANON_KEY = sanitizeEnvVar(process.env.SUPABASE_ANON_KEY || '');
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     console.warn('Supabase credentials missing. Check your .env file.');
@@ -12,7 +17,10 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
 
 export const supabase = createClient(SUPABASE_URL || 'https://placeholder.supabase.co', SUPABASE_ANON_KEY || 'placeholder');
 
-const isSupabaseConfigured = !!SUPABASE_URL && !!SUPABASE_ANON_KEY;
+const isSupabaseConfigured = !!SUPABASE_URL && 
+                             SUPABASE_URL !== 'https://placeholder.supabase.co' && 
+                             !!SUPABASE_ANON_KEY && 
+                             SUPABASE_ANON_KEY !== 'placeholder';
 
 // Types
 export interface Profile {
