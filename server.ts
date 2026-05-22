@@ -27,8 +27,8 @@ app.use(express.json());
  */
 
 // Initialize Supabase
-const supabaseUrl = process.env.SUPABASE_URL || "https://placeholder.supabase.co";
-const supabaseKey = process.env.SUPABASE_ANON_KEY || "placeholder";
+const supabaseUrl = process.env.SUPABASE_URL || "";
+const supabaseKey = process.env.SUPABASE_ANON_KEY || "";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const CHEF_NINO_INTRO = "Hello! I'm Chef Nino, your cheerful digital kitchen assistant! 👨‍🍳✨";
@@ -69,7 +69,9 @@ app.post("/api/chat", async (req, res) => {
             return res.status(400).json({ error: "Message is required" });
         }
 
-        const isSupabaseConfigured = !!process.env.SUPABASE_URL && !!process.env.SUPABASE_ANON_KEY;
+        if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+            return res.status(500).json({ error: "Server configuration error: missing Supabase credentials" });
+        }
 
         const allKeywords = extractKeywords(message);
         const dietaryTags = extractDietaryRestrictions(message);
@@ -79,11 +81,11 @@ app.post("/api/chat", async (req, res) => {
             .filter(kw => !dietaryTags.some(dt => dt.includes(kw) || kw.includes(dt)))
             .slice(0, 5); 
 
-        console.log(`Searching recipes. Keywords: ${keywords.join(", ")}, Dietary: ${dietaryTags.join(", ")}, Supabase active: ${isSupabaseConfigured}`);
+        console.log(`Searching recipes. Keywords: ${keywords.join(", ")}, Dietary: ${dietaryTags.join(", ")}`);
 
         let recipes: any[] = [];
         
-        if (isSupabaseConfigured && (keywords.length > 0 || dietaryTags.length > 0)) {
+        if (keywords.length > 0 || dietaryTags.length > 0) {
             // Build query
             let query = supabase.from("recipes").select("*");
             
