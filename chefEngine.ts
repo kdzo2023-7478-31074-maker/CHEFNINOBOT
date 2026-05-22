@@ -182,6 +182,11 @@ const DEFAULT_GENERIC_RECIPE = {
 function isCulinaryQuery(msg: string): boolean {
     const lower = msg.toLowerCase().trim();
     
+    // Explicitly allow numeric inputs, cancel commands, and info requests so they are not rejected
+    if (/^\d+$/.test(lower) || ["cancel", "stop", "back", "yes", "no", "ok", "okay", "sure", "next", "prev", "previous", "info", "details", "more", "help"].includes(lower)) {
+        return true;
+    }
+    
     // Explicit culinary words
     const culinaryKeywords = [
         "recipe", "cook", "bake", "fry", "sauté", "roast", "boil", "steam", "simmer", "grill", "stew",
@@ -296,7 +301,11 @@ export function generateInteractiveResponse(
                     ingList = recipe.ingredients.map((ing: any) => {
                         if (typeof ing === 'string') return ing;
                         if (typeof ing === 'object' && ing !== null) {
-                            return ing.original || ing.name || JSON.stringify(ing);
+                            if (ing.original) return ing.original;
+                            let label = ing.name || '';
+                            if (ing.amount) label = `${ing.amount} ${label}`;
+                            if (ing.notes) label = `${label} (${ing.notes})`;
+                            return label || JSON.stringify(ing);
                         }
                         return String(ing);
                     });

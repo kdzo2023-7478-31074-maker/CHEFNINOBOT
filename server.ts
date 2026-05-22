@@ -80,19 +80,107 @@ app.post(["/api/chat", "/chat", "/api", "/"], async (req, res) => {
                               realSupabaseKey && 
                               realSupabaseKey !== "placeholder";
 
-        const allKeywords = extractKeywords(message);
-        const dietaryTags = extractDietaryRestrictions(message);
-        
-        // Remove dietary tags from keywords to avoid redundant search
-        const keywords = allKeywords
-            .filter(kw => !dietaryTags.some(dt => dt.includes(kw) || kw.includes(dt)))
-            .slice(0, 5); 
+        const lowerMessage = message.trim().toLowerCase();
 
-        console.log(`Searching recipes. Keywords: ${keywords.join(", ")}, Dietary: ${dietaryTags.join(", ")}`);
+        // 1. Direct Cancel/Stop command handling
+        if (lowerMessage === "cancel" || lowerMessage === "stop") {
+            return res.json({
+                response: "### ⏸️ Cook's Timeout!\n\nNo problem! I have cleared our active recipe card and paused the skillet. 🍳 Let's start fresh. What would you like to search in our live database pantry next? Just name any ingredient, cuisine (like *Filipino*, *Asian*, *Western*), or dietary tags (like *vegan*, *gluten-free*)!"
+            });
+        }
+
+        // 2. Direct Info/Help command handling
+        if (lowerMessage === "info" || lowerMessage === "help") {
+            return res.json({
+                response: "### 👨‍🍳 Chef Nino's Handy Kitchen Directory 📖✨\n\nWelcome to your direct Supabase recipe dashboard! Here is how we can cook up a storm together:\n\n1. **Search with Ingredients/Dishes:** Simply type any ingredient (like *chicken*, *shrimp*, *mushroom*) or a dish name (like *adobo*, *pasta*) to search the database.\n2. **Filter by Cooking Skill:** I'll tailor my guidance to your skill level (*beginner*, *intermediate*, *advanced*).\n3. **View Recipe Details:** When I present search results, simply reply with the number corresponding to the recipe (e.g. `1` or `2`) to view the complete instructions and pantry list!\n4. **Reset/Cancel:** Type `cancel` anytime to reset the current prep session and start searching fresh.\n\nNow, let's fire up the stove—what are we cooking? 🍛🥄"
+            });
+        }
+
+        // 3. Selection indexing regex
+        const numericMatch = message.match(/\b(1|2|3|4|5|one|two|three|four|five|first|second|third|fourth|fifth)\b/i);
+        let selectedIndex = -1;
+        if (numericMatch) {
+            const word = numericMatch[1].toLowerCase();
+            if (word === "1" || word === "one" || word === "first") selectedIndex = 0;
+            else if (word === "2" || word === "two" || word === "second") selectedIndex = 1;
+            else if (word === "3" || word === "three" || word === "third") selectedIndex = 2;
+            else if (word === "4" || word === "four" || word === "fourth") selectedIndex = 3;
+            else if (word === "5" || word === "five" || word === "fifth") selectedIndex = 4;
+        }
 
         let recipes: any[] = [];
-        
-        if (hasRealSupabase) {
+        let queryMessage = message;
+        let dietaryTags = extractDietaryRestrictions(message);
+        let keywords = extractKeywords(message);
+
+        if (selectedIndex !== -1 && hasRealSupabase) {
+            // Find what the last query text was from history to query database for the same list
+            let lastRealQuery = "";
+            if (history && Array.isArray(history)) {
+                for (let i = history.length - 1; i >= 0; i--) {
+                    const hMsg = history[i];
+                    const text = hMsg.parts?.[0]?.text || hMsg.content || "";
+                    const lowerText = text.toLowerCase().trim();
+                    if (text && 
+                        !lowerText.match(/^\d+$/) && 
+                        !["cancel", "stop", "info", "help", "2", "1", "3", "4", "5", "second", "first", "third", "fourth", "fifth"].includes(lowerText)) {
+                        lastRealQuery = text;
+                        break;
+                    }
+                }
+            }
+
+            console.log(`User numerical choice detected: indices row ${selectedIndex}. Last query: "${lastRealQuery}"`);
+            
+            // Search or retrieve matching subset
+            let baseQuery = supabase.from("recipes").select("*");
+            let targetKeywords = lastRealQuery ? extractKeywords(lastRealQuery) : [];
+            let targetDietary = lastRealQuery ? extractDietaryRestrictions(lastRealQuery) : [];
+
+            if (targetDietary.length > 0) {
+                baseQuery = baseQuery.overlaps("dietary_tags", targetDietary);
+            }
+
+            const filterParts: string[] = [];
+            targetKeywords.forEach(kw => {
+                const safeKw = kw.replace(/['%_]/g, "");
+                if (safeKw) {
+                    filterParts.push(`title.ilike.%${safeKw}%`);
+                    filterParts.push(`description.ilike.%${safeKw}%`);
+                }
+            });
+
+            try {
+                let matches: any[] = [];
+                if (filterParts.length > 0) {
+                    const { data } = await baseQuery.or(filterParts.join(",")).limit(5);
+                    if (data) matches = data;
+                } else if (targetDietary.length > 0) {
+                    const { data } = await baseQuery.limit(5);
+                    if (data) matches = data;
+                }
+
+                // If nothing matches or no target, fetch default recipe items directly
+                if (matches.length === 0) {
+                    const { data } = await supabase.from("recipes").select("*").limit(5);
+                    if (data) matches = data;
+                }
+
+                if (matches && matches[selectedIndex]) {
+                    recipes = [matches[selectedIndex]];
+                    console.log(`Directly matched Supabase recipe: "${recipes[0].title}"`);
+                }
+            } catch (err) {
+                console.error("Supabase recipe indexing selection query failed:", err);
+            }
+        } else if (hasRealSupabase) {
+            // Remove dietary tags from keywords to avoid redundant search
+            keywords = keywords
+                .filter(kw => !dietaryTags.some(dt => dt.includes(kw) || kw.includes(dt)))
+                .slice(0, 5); 
+
+            console.log(`Searching recipes. Keywords: ${keywords.join(", ")}, Dietary: ${dietaryTags.join(", ")}`);
+
             // Build query
             let query = supabase.from("recipes").select("*");
             
