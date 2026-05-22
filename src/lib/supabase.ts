@@ -8,8 +8,20 @@ const sanitizeEnvVar = (val: string | undefined): string => {
     return val.trim().replace(/^['"““”\s]+|['"““”\s]+$/g, "");
 };
 
-const SUPABASE_URL = sanitizeEnvVar(process.env.SUPABASE_URL || '');
-const SUPABASE_ANON_KEY = sanitizeEnvVar(process.env.SUPABASE_ANON_KEY || '');
+const getSafeEnvVar = (name: string): string => {
+    const viteKey = `VITE_${name}`;
+    const metaCast = import.meta as any;
+    if (typeof import.meta !== 'undefined' && metaCast && metaCast.env && metaCast.env[viteKey]) {
+        return metaCast.env[viteKey];
+    }
+    if (typeof process !== 'undefined' && process.env && process.env[name]) {
+        return process.env[name] || "";
+    }
+    return "";
+};
+
+const SUPABASE_URL = sanitizeEnvVar(getSafeEnvVar('SUPABASE_URL'));
+const SUPABASE_ANON_KEY = sanitizeEnvVar(getSafeEnvVar('SUPABASE_ANON_KEY'));
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
     console.warn('Supabase credentials missing. Check your .env file.');
