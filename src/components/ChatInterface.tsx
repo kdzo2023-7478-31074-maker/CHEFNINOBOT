@@ -227,7 +227,7 @@ export function ChatInterface() {
         const errorMessage = {
           session_id: session.id,
           user_id: session.user_id,
-          role: 'assistant',
+          role: 'bot',
           content: `Prep Station Interruption\n\nChef Nino encountered an unexpected cooking interruption. Clearing the cook station...`,
           created_at: new Date().toISOString()
         };
@@ -238,7 +238,7 @@ export function ChatInterface() {
       const botMessage = {
         session_id: session.id,
         user_id: session.user_id,
-        role: 'assistant',
+        role: 'bot',
         content: data.response,
         created_at: new Date().toISOString()
       };
@@ -252,7 +252,7 @@ export function ChatInterface() {
       const errorMessage = {
         session_id: session.id,
         user_id: session.user_id,
-        role: 'assistant',
+        role: 'bot',
         content: `Pantry Network Offline\n\nA network ripple interrupted Chef Nino. Please ensure the kitchen is active.`,
         created_at: new Date().toISOString()
       };
