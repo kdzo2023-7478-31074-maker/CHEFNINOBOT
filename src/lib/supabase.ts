@@ -443,3 +443,52 @@ export const getSavedRecipes = async (userId: string) => {
         .select('*, recipes(*)')
         .eq('user_id', userId);
 };
+
+// Reconcile database state on 'refresh' or 'logout' to ensure persistent storage matches actual database records
+export const reconcileDatabaseState = async (action: 'refresh' | 'logout', userId?: string) => {
+    console.log(`Reconciling database state on ${action} for user: ${userId || 'unknown'}`);
+    
+    // 1. Explicitly clear or reset local storage entries for active/all sessions
+    if (typeof window !== 'undefined') {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key) {
+                // If it's a logout, clear all nino_ sessions, messages and journal
+                if (action === 'logout') {
+                    if (key.startsWith('nino_sessions_') || key.startsWith('nino_messages_') || key.startsWith('nino_journal_')) {
+                        keysToRemove.push(key);
+                    }
+                } else if (action === 'refresh') {
+                    // If it's a refresh, clear sessions and messages to fetch fresh ones from the database
+                    if (key.startsWith('nino_messages_') || key.startsWith('nino_sessions_')) {
+                        keysToRemove.push(key);
+                    }
+                }
+            }
+        }
+        keysToRemove.forEach(key => {
+            try {
+                localStorage.removeItem(key);
+            } catch (e) {
+                console.error(`Failed to remove key ${key}:`, e);
+            }
+        });
+    }
+
+    // 2. Clear or reset database entries for active sessions if online
+    if (isSupabaseConfigured && userId) {
+        try {
+            if (action === 'logout' || action === 'refresh') {
+                // Mark active sessions of user as closed (inactive) to match database records
+                await supabase
+                    .from('chat_sessions')
+                    .update({ is_active: false })
+                    .eq('user_id', userId)
+                    .eq('is_active', true);
+            }
+        } catch (dbErr) {
+            console.error("Error setting active sessions status in Supabase during state reconciliation:", dbErr);
+        }
+    }
+};

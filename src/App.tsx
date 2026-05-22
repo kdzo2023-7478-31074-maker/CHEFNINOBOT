@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { supabase, getUser } from './lib/supabase';
+import { supabase, getUser, reconcileDatabaseState } from './lib/supabase';
 import { Auth } from './components/Auth';
 import { ChatInterface } from './components/ChatInterface';
 import { RecipeJournal } from './components/RecipeJournal';
@@ -44,7 +44,15 @@ export default function App() {
     };
   }, []);
 
+  const handleRefresh = async () => {
+    if (user) {
+      await reconcileDatabaseState('refresh', user.id);
+      window.location.reload();
+    }
+  };
+
   const handleSignOut = async () => {
+    await reconcileDatabaseState('logout', user?.id);
     await supabase.auth.signOut();
   };
 
@@ -80,6 +88,15 @@ export default function App() {
              <div className="w-2 h-2 rounded-full bg-[#49111c] shadow-[0_0_8px_#49111c]"></div>
              <span className="text-[10px] font-mono tracking-wider opacity-60 uppercase">Chef on Duty: {user.user_metadata?.username || 'Active'}</span>
           </div>
+
+          <button 
+            onClick={handleRefresh}
+            className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a9927d] hover:text-[#f2f4f3] transition-colors"
+          >
+            Reset Station (Refresh)
+          </button>
+
+          <span className="h-4 w-px bg-[#5e503f]" />
 
           <button 
             onClick={handleSignOut}
