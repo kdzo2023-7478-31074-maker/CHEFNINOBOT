@@ -27,8 +27,8 @@ app.use(express.json());
  */
 
 // Initialize Supabase
-const supabaseUrl = process.env.SUPABASE_URL || "";
-const supabaseKey = process.env.SUPABASE_ANON_KEY || "";
+const supabaseUrl = process.env.SUPABASE_URL || "https://placeholder.supabase.co";
+const supabaseKey = process.env.SUPABASE_ANON_KEY || "placeholder";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const CHEF_NINO_INTRO = "Hello! I'm Chef Nino, your cheerful digital kitchen assistant! 👨‍🍳✨";

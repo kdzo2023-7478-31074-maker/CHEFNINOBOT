@@ -224,9 +224,14 @@ export function ChatInterface() {
       if (!res.ok) {
         let errorMessageText = "Chef Nino encountered an unexpected cooking interruption. Clearing the cook station...";
         try {
-          const errData = await res.json();
-          if (errData && errData.error) {
-            errorMessageText = errData.error;
+          const contentType = res.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const errData = await res.json();
+            if (errData && errData.error) {
+              errorMessageText = errData.error;
+            }
+          } else {
+            errorMessageText = `The backend responded with server status code ${res.status}. No system error data was provided.`;
           }
         } catch (_) {}
 
@@ -235,6 +240,19 @@ export function ChatInterface() {
           user_id: session.user_id,
           role: 'assistant',
           content: `Prep Station Interruption\n\n${errorMessageText}`,
+          created_at: new Date().toISOString()
+        };
+        setMessages(prev => [...prev, errorMessage]);
+        return;
+      }
+
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const errorMessage = {
+          session_id: session.id,
+          user_id: session.user_id,
+          role: 'assistant',
+          content: `Prep Station Interruption\n\nNino's kitchen received an unexpected response from the backend. The server returned HTML instead of JSON.\n\n*Why does this happen?* This usually means the serverless Vercel function or local express server has not compiled fully, or a build error prevented the serverless function starting. Please investigate your Vercel deployment logs under the deployments tab.`,
           created_at: new Date().toISOString()
         };
         setMessages(prev => [...prev, errorMessage]);
