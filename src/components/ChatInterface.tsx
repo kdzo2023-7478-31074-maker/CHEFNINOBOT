@@ -208,7 +208,7 @@ export function ChatInterface() {
       // 2. Save user message to Supabase
       await saveMessage(userMessage);
 
-      // 3. Get response from Gemini via our server
+      // 3. Get response from Chef Nino's Supabase-backed recipe engine via our server
       const chatHistory = messages.map(m => ({
         role: m.role === 'user' ? 'user' : 'model',
         parts: [{ text: m.content }]

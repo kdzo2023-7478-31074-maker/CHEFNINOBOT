@@ -90,7 +90,7 @@ app.get(["/api/config", "/config"], (req, res) => {
 });
 
 app.post(["/api/chat", "/chat", "/api", "/"], async (req, res) => {
-    console.log("POST /api/chat (or compatible route) received - Dynamic Interactive Gemini mode");
+    console.log("POST /api/chat (or compatible route) received - Direct Interactive Supabase Search mode");
     try {
         const { message, history, nlpAnalysis } = req.body;
         
