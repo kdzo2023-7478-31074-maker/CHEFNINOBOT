@@ -24,18 +24,21 @@ const SUPABASE_URL = sanitizeEnvVar(getSafeEnvVar('SUPABASE_URL'));
 const SUPABASE_ANON_KEY = sanitizeEnvVar(getSafeEnvVar('SUPABASE_ANON_KEY'));
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    console.warn('Supabase credentials missing. Check your .env file.');
+    console.warn('Supabase credentials missing. Check your .env file or production setup.');
 }
 
-// Support dynamic client self-healing for Vercel/production environments
-let activeClient = createClient(SUPABASE_URL || 'https://placeholder.supabase.co', SUPABASE_ANON_KEY || 'placeholder');
-let isSupabaseConfigured = !!SUPABASE_URL && 
+export let isSupabaseConfigured = !!SUPABASE_URL && 
                            SUPABASE_URL !== 'https://placeholder.supabase.co' && 
                            !!SUPABASE_ANON_KEY && 
                            SUPABASE_ANON_KEY !== 'placeholder';
 
+let activeClient = createClient(SUPABASE_URL || 'https://placeholder.supabase.co', SUPABASE_ANON_KEY || 'placeholder');
+
 export const supabase = new Proxy({} as any, {
     get(target, prop) {
+        if (!activeClient) {
+            activeClient = createClient(SUPABASE_URL || 'https://placeholder.supabase.co', SUPABASE_ANON_KEY || 'placeholder');
+        }
         const val = Reflect.get(activeClient, prop);
         if (typeof val === 'function') {
             return val.bind(activeClient);
@@ -44,34 +47,30 @@ export const supabase = new Proxy({} as any, {
     }
 });
 
-export const updateSupabaseClient = (url: string, key: string) => {
-    if (!url || url === 'https://placeholder.supabase.co' || !key || key === 'placeholder') return;
-    try {
-        activeClient = createClient(url, key);
-        isSupabaseConfigured = true;
-        console.log("Supabase client dynamically successfully reconfigured with active credentials!");
-    } catch (e) {
-        console.error("Failed to dynamically initialize Supabase client:", e);
-    }
-};
-
-// Asynchronous background config poll upon startup
-const fetchDynamicConfigOnLoad = async () => {
+export const initSupabase = async () => {
     try {
         const res = await fetch('/api/config');
         if (res.ok) {
             const data = await res.json();
             if (data.supabaseUrl && data.supabaseAnonKey) {
-                updateSupabaseClient(data.supabaseUrl, data.supabaseAnonKey);
+                const url = sanitizeEnvVar(data.supabaseUrl);
+                const key = sanitizeEnvVar(data.supabaseAnonKey);
+                if (url && url !== 'https://placeholder.supabase.co' && key && key !== 'placeholder') {
+                    activeClient = createClient(url, key);
+                    isSupabaseConfigured = true;
+                    console.log("Supabase client initialized via dynamic server config!");
+                    return;
+                }
             }
         }
     } catch (e) {
-        console.warn("Dynamic configuration fetch bypassed or unavailable. Standard fallbacks active:", e);
+        console.warn("Unable to fetch dynamic server configuration, standard environment defaults active:", e);
     }
 };
 
+// Auto-run if inside window context, so fallback is ready
 if (typeof window !== 'undefined') {
-    fetchDynamicConfigOnLoad();
+    initSupabase();
 }
 
 // Types

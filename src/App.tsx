@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { supabase, getUser, reconcileDatabaseState } from './lib/supabase';
+import { supabase, getUser, reconcileDatabaseState, initSupabase } from './lib/supabase';
 import { Auth } from './components/Auth';
 import { ChatInterface } from './components/ChatInterface';
 import { RecipeJournal } from './components/RecipeJournal';
@@ -17,29 +17,42 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'chat' | 'saved'>('chat');
 
   useEffect(() => {
-    // Check current session
+    let active = true;
+    let subscription: any = null;
+
+    // Check current session and initialize client dynamically
     const initAuth = async () => {
+      await initSupabase();
+      
+      if (!active) return;
+
       const currentUser = await getUser();
       setUser(currentUser);
       setLoading(false);
+
+      // Listen for auth changes on the fully configured model client
+      const authChange = supabase.auth.onAuthStateChange((_event: any, session: any) => {
+        if (active) {
+          setUser(session?.user ?? null);
+        }
+      });
+      subscription = authChange.data.subscription;
     };
     initAuth();
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
     // Custom tab switcher listener
     const handleSwitchTab = (e: any) => {
-      if (e.detail) {
+      if (e.detail && active) {
         setActiveTab(e.detail);
       }
     };
     window.addEventListener('nino-switch-tab', handleSwitchTab);
 
     return () => {
-      subscription.unsubscribe();
+      active = false;
+      if (subscription) {
+        subscription.unsubscribe();
+      }
       window.removeEventListener('nino-switch-tab', handleSwitchTab);
     };
   }, []);
